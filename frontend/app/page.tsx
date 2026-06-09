@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface Post {
   id: number;
@@ -27,7 +27,7 @@ export default function Home() {
   // Toast notification states
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
-  const API_URL = "http://127.0.0.1:8000/posts";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/posts";
 
   // Trigger toast auto-dismissal
   useEffect(() => {
@@ -40,7 +40,9 @@ export default function Home() {
   }, [toast]);
 
   // Fetch posts from backend or load from localStorage if offline
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
+    // Defer state updates to avoid synchronous setState inside useEffect
+    await Promise.resolve();
     setLoading(true);
     setError(null);
     try {
@@ -53,7 +55,7 @@ export default function Home() {
       setIsOffline(false);
       // Synchronize to localStorage
       localStorage.setItem("mypustak_posts", JSON.stringify(data));
-    } catch (err: any) {
+    } catch (err) {
       console.error("Backend offline. Falling back to localStorage:", err);
       setIsOffline(true);
       setError("Unable to connect to backend server. Running in Local Storage Mode.");
@@ -68,11 +70,11 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [fetchPosts]);
 
   // Save changes to localStorage in offline mode
   const saveToLocal = (updatedPosts: Post[]) => {
@@ -136,9 +138,10 @@ export default function Home() {
       setTitle("");
       setBody("");
       setToast({ message: "Post created successfully!", type: "success" });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setToast({ message: err.message || "Failed to create post.", type: "error" });
+      const errorMessage = err instanceof Error ? err.message : "Failed to create post.";
+      setToast({ message: errorMessage, type: "error" });
     } finally {
       setSubmitting(false);
     }
@@ -168,9 +171,10 @@ export default function Home() {
       setPosts(updated);
       localStorage.setItem("mypustak_posts", JSON.stringify(updated));
       setToast({ message: "Post deleted successfully!", type: "success" });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setToast({ message: err.message || "Failed to delete post.", type: "error" });
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete post.";
+      setToast({ message: errorMessage, type: "error" });
     }
   };
 
@@ -187,13 +191,12 @@ export default function Home() {
       {toast && (
         <div className="fixed top-6 right-6 z-50 animate-bounce">
           <div
-            className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border text-sm font-medium ${
-              toast.type === "success"
+            className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border text-sm font-medium ${toast.type === "success"
                 ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
                 : toast.type === "info"
-                ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300"
-                : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300"
-            }`}
+                  ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300"
+                  : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300"
+              }`}
           >
             {toast.type === "success" || toast.type === "info" ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
